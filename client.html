@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat POC - WebSocket Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+
+        .status-dot.connected {
+            background: #44ff44;
+        }
+
+        .user-info {
+            background: #f5f5f5;
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .user-info input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .user-info button {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .user-info button:hover {
+            background: #5568d3;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #fafafa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .message-user {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .message-content {
+            color: #333;
+            word-wrap: break-word;
+        }
+
+        .system-message {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 10px;
+            background: #e8f4f8;
+            border-radius: 8px;
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .input-area button {
+            padding: 12px 25px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .input-area button:hover {
+            background: #5568d3;
+        }
+
+        .input-area button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #999;
+            font-size: 12px;
+            padding: 10px 20px;
+            height: 20px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #999;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            30% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-button {
+            padding: 12px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .file-button:hover {
+            background: #5568d3;
+        }
+
+        .file-preview {
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            justify-content: space-between;
+        }
+
+        .file-remove {
+            color: #e74c3c;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .file-message {
+            background: #e8f4f8;
+            padding: 10px;
+            border-left: 3px solid #667eea;
+            margin-bottom: 5px;
+        }
+
+        .file-download {
+            color: #667eea;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .file-download:hover {
+            color: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> Real-time Chat Go</h1>
+            <div class="status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Disconnected</span>
+            </div>
+        </div>
+        
+        <div class="user-info">
+            <input type="text" id="usernameInput" placeholder="Enter your username" value="User">
+            <button onclick="setUsername()">Set Username</button>
+        </div>
+
+        <div class="messages" id="messages"></div>
+
+        <div class="typing-indicator" id="typingIndicator" style="display: none;">
+            <span id="typingUser"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+        </div>
+
+        <div class="file-preview" id="filePreview" style="display: none;">
+            <div class="file-info">
+                <span id="fileName"></span>
+                <span class="file-remove" onclick="removeFile()">✕ Remove</span>
+            </div>
+        </div>
+
+        <div class="input-area">
+         
+            <input type="text" id="messageInput" placeholder="Type your message..." disabled>
+            <button onclick="sendMessage()" id="sendButton" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let username = 'User';
+        let userID = null;
+        let connected = false;
+        let selectedFile = null;
+        let typingTimeout = null;
+        let isTyping = false;
+
+        function handleFileSelect() {
+            const input = document.getElementById('fileInput');
+            selectedFile = input.files[0];
+            
+            if (selectedFile) {
+                // Check file size (max 5MB)
+                if (selectedFile.size > 5 * 1024 * 1024) {
+                    alert('File too large. Maximum 5MB allowed.');
+                    input.value = '';
+                    selectedFile = null;
+                    return;
+                }
+                
+                showFilePreview();
+            }
+        }
+
+        function showFilePreview() {
+            const preview = document.getElementById('filePreview');
+            const fileName = document.getElementById('fileName');
+            
+            if (selectedFile) {
+                const sizeMB = (selectedFile.size / 1024 / 1024).toFixed(2);
+                fileName.textContent = `📁 ${selectedFile.name} (${sizeMB}MB)`;
+                preview.style.display = 'block';
+            }
+        }
+
+        function removeFile() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('filePreview').style.display = 'none';
+        }
+
+        function sendTypingIndicator() {
+            if (!connected || !ws || ws.readyState !== WebSocket.OPEN) {
+                return;
+            }
+
+            const typingMessage = {
+                type: 'typing',
+                userID: userID,
+                username: username,
+                timestamp: Math.floor(Date.now() / 1000)
+            };
+
+            try {
+                ws.send(JSON.stringify(typingMessage));
+            } catch (error) {
+                console.error('Error sending typing indicator:', error);
+            }
+        }
+
+        function startTyping() {
+            if (!isTyping) {
+                isTyping = true;
+                sendTypingIndicator();
+            }
+
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                isTyping = false;
+            }, 3000);
+        }
+
+        function connect() {
+            // Generate a user ID if not already set
+            if (!userID) {
+                userID = 'user_' + Math.random().toString(36).substr(2, 9);
+            }
+
+            // Determine WebSocket protocol based on page protocol
+            let wsProtocol = 'ws:';
+            let host = 'localhost:8080';
+            
+            // If page is served via HTTP, use ws://, if HTTPS use wss://
+            if (window.location.protocol === 'https:') {
+                wsProtocol = 'wss:';
+            }
+            
+            // Use the same host as the page, or default to localhost:8080
+            if (window.location.host) {
+                host = window.location.host;
+            }
+            
+            const wsUrl = `${wsProtocol}//${host}/ws?userID=${userID}`;
+            console.log('Connecting to:', wsUrl);
+            
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = function() {
+                    console.log('WebSocket connected with userID:', userID);
+                    connected = true;
+                    updateStatus(true);
+                    document.getElementById('messageInput').disabled = false;
+                    document.getElementById('sendButton').disabled = false;
+                    addSystemMessage('✅ Connected to chat server');
+                };
+
+                ws.onclose = function(event) {
+                    console.log('WebSocket closed:', event.code, event.reason);
+                    connected = false;
+                    updateStatus(false);
+                    document.getElementById('messageInput').disabled = true;
+                    document.getElementById('sendButton').disabled = true;
+                    addSystemMessage('❌ Disconnected from chat server');
+                    
+                    // Try to reconnect after 3 seconds (unless it was a normal close)
+                    if (event.code !== 1000) {
+                        setTimeout(connect, 3000);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    addSystemMessage('⚠️ Error connecting to server. Check console for details.');
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        console.log('Raw message received:', event.data);
+                        console.log('Message data type:', typeof event.data);
+                        const message = JSON.parse(event.data);
+                        console.log('Parsed message:', message);
+                        console.log('Message type field:', message.type);
+                        console.log('Message content field:', message.content);
+                        handleMessage(message);
+                    } catch (e) {
+                        console.error('Error parsing message:', e, 'Raw data:', event.data);
+                        addSystemMessage('⚠️ Error parsing message from server');
+                    }
+                };
+            } catch (error) {
+                console.error('Failed to create WebSocket:', error);
+                addSystemMessage('❌ Failed to create WebSocket connection');
+            }
+        }
+
+        function updateStatus(isConnected) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (isConnected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        function setUsername() {
+            const input = document.getElementById('usernameInput');
+            username = input.value.trim() || 'User';
+            addSystemMessage(`Username set to: ${username}`);
+        }
+
+        function sendMessage() {
+            if (!connected || !ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to server. Please wait for connection.');
+                console.error('WebSocket state:', ws ? ws.readyState : 'null');
+                return;
+            }
+
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+
+            if (!content && !selectedFile) {
+                return;
+            }
+
+            // Ensure username is set (use default if not)
+            if (!username || username.trim() === '') {
+                username = 'User';
+            }
+
+            // If file is selected, read it and send as file message
+            if (selectedFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const fileData = {
+                        type: 'file',
+                        userID: userID,
+                        username: username,
+                        filename: selectedFile.name,
+                        filesize: selectedFile.size,
+                        filetype: selectedFile.type,
+                        filedata: e.target.result, // Base64 encoded data
+                        content: content || 'Shared a file',
+                        timestamp: Math.floor(Date.now() / 1000)
+                    };
+
+                    try {
+                        const messageStr = JSON.stringify(fileData);
+                        console.log('Sending file message:', selectedFile.name);
+                        ws.send(messageStr);
+                        console.log('File sent successfully');
+                        input.value = '';
+                        removeFile();
+                    } catch (error) {
+                        console.error('Error sending file:', error);
+                        addSystemMessage('❌ Error sending file: ' + error.message);
+                    }
+                };
+                reader.onerror = function() {
+                    addSystemMessage('❌ Error reading file');
+                };
+                reader.readAsDataURL(selectedFile);
+            } else {
+                // Send regular text message
+                const message = {
+                    type: 'message',
+                    userID: userID,
+                    username: username,
+                    content: content,
+                    timestamp: Math.floor(Date.now() / 1000)
+                };
+
+                try {
+                    const messageStr = JSON.stringify(message);
+                    console.log('Sending message string:', messageStr);
+                    console.log('WebSocket readyState:', ws.readyState, ws.readyState === WebSocket.OPEN ? '(OPEN)' : 'NOT OPEN');
+                    console.log('User ID:', userID);
+                    ws.send(messageStr);
+                    console.log('Message sent successfully');
+                    input.value = '';
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                    addSystemMessage('❌ Error sending message: ' + error.message);
+                }
+            }
+        }
+
+        function handleMessage(message) {
+            console.log('handleMessage called with:', JSON.stringify(message));
+            console.log('Message type:', message.type, 'typeof:', typeof message.type);
+            
+            if (message.type === 'client_count') {
+                // Update status with user count
+                const statusText = document.getElementById('statusText');
+                if (statusText && connected) {
+                    statusText.textContent = `Connected (${message.clientCount} user${message.clientCount !== 1 ? 's' : ''})`;
+                }
+                console.log('Updated client count:', message.clientCount);
+            } else if (message.type === 'typing') {
+                // Show typing indicator
+                console.log('User typing:', message.username);
+                showTypingIndicator(message.username);
+            } else if (message.type === 'message') {
+                console.log('Processing message type, calling addMessage');
+                hideTypingIndicator();
+                addMessage(message);
+            } else if (message.type === 'file') {
+                console.log('Processing file type, calling addFileMessage');
+                hideTypingIndicator();
+                addFileMessage(message);
+            } else {
+                console.warn('Unknown message type:', message.type, 'Full message:', message);
+                // Try to display anyway if it has content
+                if (message.content) {
+                    console.log('Message has content, displaying anyway');
+                    addMessage(message);
+                }
+            }
+        }
+
+        function showTypingIndicator(userName) {
+            const indicator = document.getElementById('typingIndicator');
+            const typingUser = document.getElementById('typingUser');
+            typingUser.textContent = userName + ' is typing...';
+            indicator.style.display = 'flex';
+
+            // Hide after 5 seconds if no new typing message
+            clearTimeout(window.typingIndicatorTimeout);
+            window.typingIndicatorTimeout = setTimeout(() => {
+                hideTypingIndicator();
+            }, 5000);
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = 'none';
+        }
+
+        function addFileMessage(message) {
+            console.log('Adding file message to UI:', message);
+            const messagesDiv = document.getElementById('messages');
+            if (!messagesDiv) {
+                console.error('Messages div not found!');
+                return;
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+            
+            const userSpan = document.createElement('span');
+            userSpan.className = 'message-user';
+            userSpan.textContent = message.username || 'Anonymous';
+
+            const timeSpan = document.createElement('span');
+            const timestamp = message.timestamp || Math.floor(Date.now() / 1000);
+            const date = new Date(timestamp * 1000);
+            timeSpan.textContent = date.toLocaleTimeString();
+
+            header.appendChild(userSpan);
+            header.appendChild(timeSpan);
+
+            const content = document.createElement('div');
+            content.className = 'file-message';
+            
+            const fileInfo = document.createElement('div');
+            fileInfo.style.marginBottom = '5px';
+            fileInfo.textContent = '📎 ' + message.filename;
+            
+            const sizeInfo = document.createElement('div');
+            sizeInfo.style.fontSize = '11px';
+            sizeInfo.style.color = '#888';
+            sizeInfo.textContent = (message.filesize / 1024).toFixed(2) + ' KB';
+            
+            const downloadLink = document.createElement('div');
+            downloadLink.className = 'file-download';
+            downloadLink.textContent = '⬇ Download';
+            downloadLink.onclick = function() {
+                downloadFile(message.filedata, message.filename, message.filetype);
+            };
+
+            content.appendChild(fileInfo);
+            content.appendChild(sizeInfo);
+            content.appendChild(downloadLink);
+
+            if (message.content && message.content !== 'Shared a file') {
+                const msgContent = document.createElement('div');
+                msgContent.style.marginTop = '8px';
+                msgContent.style.paddingTop = '8px';
+                msgContent.style.borderTop = '1px solid #ddd';
+                msgContent.textContent = message.content;
+                content.appendChild(msgContent);
+            }
+
+            messageDiv.appendChild(header);
+            messageDiv.appendChild(content);
+            messagesDiv.appendChild(messageDiv);
+
+            // Scroll to bottom
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            console.log('File message added to UI successfully');
+        }
+
+        function downloadFile(dataUrl, filename, filetype) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function addMessage(message) {
+            console.log('Adding message to UI:', message);
+            const messagesDiv = document.getElementById('messages');
+            if (!messagesDiv) {
+                console.error('Messages div not found!');
+                return;
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+            
+            const userSpan = document.createElement('span');
+            userSpan.className = 'message-user';
+            userSpan.textContent = message.username || 'Anonymous';
+
+            const timeSpan = document.createElement('span');
+            // Handle timestamp (could be in seconds or milliseconds)
+            const timestamp = message.timestamp || Math.floor(Date.now() / 1000);
+            const date = new Date(timestamp * 1000);
+            timeSpan.textContent = date.toLocaleTimeString();
+
+            header.appendChild(userSpan);
+            header.appendChild(timeSpan);
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            content.textContent = message.content || '';
+
+            messageDiv.appendChild(header);
+            messageDiv.appendChild(content);
+            messagesDiv.appendChild(messageDiv);
+
+            // Scroll to bottom
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            console.log('Message added to UI successfully');
+        }
+
+        function addSystemMessage(text) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Allow sending message with Enter key and detect typing
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            startTyping();
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Detect typing on input
+        document.getElementById('messageInput').addEventListener('input', function(e) {
+            startTyping();
+        });
+
+        // Allow setting username with Enter key
+        document.getElementById('usernameInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                setUsername();
+            }
+        });
+
+        // Connect on page load
+        connect();
+    </script>
+</body>
+</html>
+
